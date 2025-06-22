@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Station {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String    @unique
+  city        String
+  state       String
+  country     String
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  departureSchedules Schedule[] @relation("DepartureStation")
+  arrivalSchedules   Schedule[] @relation("ArrivalStation")
+
+  @@map("stations")
+}
+
+model Train {
+  id          Int       @id @default(autoincrement())
+  trainNumber String    @unique
+  name        String
+  type        TrainType
+  capacity    Int
+  status      TrainStatus @default(ACTIVE)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  schedules Schedule[]
+
+  @@map("trains")
+}
+
+model Schedule {
+  id              Int       @id @default(autoincrement())
+  trainId         Int
+  departureStationId Int
+  arrivalStationId   Int
+  departureTime   DateTime
+  arrivalTime     DateTime
+  duration        Int       // in minutes
+  price           Float
+  status          ScheduleStatus @default(ACTIVE)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  train             Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  departureStation  Station  @relation("DepartureStation", fields: [departureStationId], references: [id], onDelete: Cascade)
+  arrivalStation    Station  @relation("ArrivalStation", fields: [arrivalStationId], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+enum TrainType {
+  EXPRESS
+  LOCAL
+  FREIGHT
+  HIGH_SPEED
+}
+
+enum TrainStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  CANCELLED
+  DELAYED
+  COMPLETED
+} 
