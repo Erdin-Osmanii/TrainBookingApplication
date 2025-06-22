@@ -6,10 +6,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { User, UserWithoutPassword, UserRole } from './schemas/user.schema';
 import * as bcrypt from 'bcrypt';
-import { User } from './user.entity';
-
-type UserWithoutPassword = Omit<User, 'password'>;
 
 @Injectable()
 export class UserService {
@@ -18,12 +17,19 @@ export class UserService {
   async create(data: CreateUserDto): Promise<UserWithoutPassword> {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const user = await this.prisma.user.create({
-      data: { ...data, password: hashedPassword },
+      data: {
+        ...data,
+        password: hashedPassword,
+        role: UserRole.CUSTOMER, // Default to CUSTOMER
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
   }
 
   async findAll(): Promise<UserWithoutPassword[]> {
@@ -31,7 +37,10 @@ export class UserService {
     return users.map((user) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
+      return {
+        ...userWithoutPassword,
+        role: UserRole[user.role as keyof typeof UserRole],
+      };
     });
   }
 
@@ -43,11 +52,19 @@ export class UserService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return null;
+    return {
+      ...user,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
   }
 
   async update(id: number, data: UpdateUserDto): Promise<UserWithoutPassword> {
@@ -78,7 +95,33 @@ export class UserService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
+  }
+
+  async updateRole(
+    id: number,
+    data: UpdateUserRoleDto,
+  ): Promise<UserWithoutPassword> {
+    // Check if user exists
+    const existingUser = await this.prisma.user.findUnique({ where: { id } });
+    if (!existingUser) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { role: data.role },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+    return {
+      ...userWithoutPassword,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
   }
 
   async remove(id: number): Promise<UserWithoutPassword> {
@@ -92,6 +135,9 @@ export class UserService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      role: UserRole[user.role as keyof typeof UserRole],
+    };
   }
 }

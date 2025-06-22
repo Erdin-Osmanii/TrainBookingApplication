@@ -77,20 +77,20 @@ The service will run at:
 
 ### 👤 User CRUD
 
-| Method | Endpoint          | Description            |
-|--------|-------------------|------------------------|
-| POST   | `/users`          | Create a new user      |
-| GET    | `/users`          | Get all users          |
-| GET    | `/users/:id`      | Get user by ID         |
-| PATCH  | `/users/:id`      | Update user            |
-| DELETE | `/users/:id`      | Delete user            |
+| Method | Endpoint     | Description       |
+| ------ | ------------ | ----------------- |
+| POST   | `/users`     | Create a new user |
+| GET    | `/users`     | Get all users     |
+| GET    | `/users/:id` | Get user by ID    |
+| PATCH  | `/users/:id` | Update user       |
+| DELETE | `/users/:id` | Delete user       |
 
 > ⚠️ The update endpoint ensures **email uniqueness**.
 
 ### 🔐 Authentication
 
 | Method | Endpoint         | Description               |
-|--------|------------------|---------------------------|
+| ------ | ---------------- | ------------------------- |
 | POST   | `/auth/login`    | Login with email/password |
 | POST   | `/auth/register` | Register new user         |
 
@@ -105,11 +105,5 @@ TBD (You can add `Jest` or `Supertest` support for integration tests.)
 - [PostgreSQL](https://www.postgresql.org/)
 - [bcrypt](https://www.npmjs.com/package/bcrypt)
 - [JWT](https://jwt.io/)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
 
 **Made with ❤️ using NestJS Microservices**
