@@ -1,21 +1,21 @@
 # Train-MS Microservice
 
-A NestJS microservice for managing train-related data with role-based access control.
+A NestJS microservice for managing train, station, and schedule data with role-based access control and internal microservice communication.
 
 ## Features
 
 - **Station Management**: CRUD operations for train stations
-- **Train Management**: CRUD operations for trains with different types
+- **Train Management**: CRUD operations for trains
 - **Schedule Management**: CRUD operations for train schedules and routes
 - **Role-Based Access Control**: JWT authentication with ADMIN/CUSTOMER roles
-- **Internal Service Communication**: Endpoints for other microservices
+- **Internal Service Communication**: Endpoints for other microservices (HTTP & TCP)
 
 ## Authentication & Authorization
 
 ### User Roles
 
 - **CUSTOMER**: Can view all data (GET endpoints)
-- **ADMIN**: Can perform all operations (GET, POST, PUT, DELETE)
+- **ADMIN**: Can perform all operations (GET, POST, PATCH, DELETE)
 
 ### JWT Token Structure
 
@@ -30,8 +30,6 @@ A NestJS microservice for managing train-related data with role-based access con
 ## API Endpoints
 
 ### Public Endpoints (No Authentication Required)
-
-All GET endpoints are public and can be accessed without authentication.
 
 #### Stations
 
@@ -59,8 +57,6 @@ All GET endpoints are public and can be accessed without authentication.
 
 ### Admin-Only Endpoints (Require ADMIN Role)
 
-All POST, PUT, PATCH, and DELETE endpoints require ADMIN role.
-
 #### Stations
 
 - `POST /stations` - Create station
@@ -79,44 +75,35 @@ All POST, PUT, PATCH, and DELETE endpoints require ADMIN role.
 - `PATCH /schedules/:id` - Update schedule
 - `DELETE /schedules/:id` - Delete schedule
 
-### Internal Service Communication
+### Internal Service Communication (HTTP & TCP)
 
-These endpoints are designed for inter-service communication and don't require authentication.
+#### HTTP Internal Endpoints
 
-- `GET /stations/internal/validate/:id` - Validate station exists
-- `GET /stations/internal/details/:id` - Get station details
 - `GET /trains/internal/validate/:id` - Validate train exists
 - `GET /trains/internal/details/:id` - Get train details
 - `GET /schedules/internal/validate-route?departureStationId=X&arrivalStationId=Y` - Validate route
 - `GET /schedules/internal/route-schedules?departureStationId=X&arrivalStationId=Y&date=YYYY-MM-DD` - Get route schedules
 - `GET /schedules/internal/schedule/:id` - Get schedule details
 
+#### TCP Endpoints (Microservice)
+
+- `@MessagePattern({ cmd: 'validate-train' })` - Validate train by ID
+- `@MessagePattern({ cmd: 'get-train-details' })` - Get train details by ID
+- `@MessagePattern({ cmd: 'get-train-schedules' })` - Get train schedules by train ID
+- `@MessagePattern({ cmd: 'get-train-by-number' })` - Get train by number
+- `@MessagePattern({ cmd: 'validate-route' })` - Validate route
+- `@MessagePattern({ cmd: 'get-route-schedules' })` - Get route schedules
+- `@MessagePattern({ cmd: 'get-schedule-details' })` - Get schedule details
+
 ## Usage Examples
 
-### 1. Get All Stations (Public)
+### 1. Get All Trains (Public)
 
 ```bash
-curl -X GET http://localhost:3002/stations
+curl -X GET http://localhost:3002/trains
 ```
 
-### 2. Create a Station (Admin Only)
-
-```bash
-curl -X POST http://localhost:3002/stations \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Central Station",
-    "code": "CST",
-    "city": "New York",
-    "state": "NY",
-    "country": "USA",
-    "latitude": 40.7589,
-    "longitude": -73.9851
-  }'
-```
-
-### 3. Create a Train (Admin Only)
+### 2. Create a Train (Admin Only)
 
 ```bash
 curl -X POST http://localhost:3002/trains \
@@ -130,7 +117,7 @@ curl -X POST http://localhost:3002/trains \
   }'
 ```
 
-### 4. Create a Schedule (Admin Only)
+### 3. Create a Schedule (Admin Only)
 
 ```bash
 curl -X POST http://localhost:3002/schedules \
@@ -145,18 +132,6 @@ curl -X POST http://localhost:3002/schedules \
     "duration": 120,
     "price": 50.00
   }'
-```
-
-### 5. Search for Routes (Public)
-
-```bash
-curl -X GET "http://localhost:3002/schedules/routes"
-```
-
-### 6. Get Schedules by Date (Public)
-
-```bash
-curl -X GET "http://localhost:3002/schedules/date/2024-01-15"
 ```
 
 ## Error Responses
@@ -184,10 +159,7 @@ curl -X GET "http://localhost:3002/schedules/date/2024-01-15"
 ```json
 {
   "statusCode": 400,
-  "message": [
-    "email must be an email",
-    "password must be longer than or equal to 6 characters"
-  ]
+  "message": ["field must be a string"]
 }
 ```
 
@@ -195,50 +167,42 @@ curl -X GET "http://localhost:3002/schedules/date/2024-01-15"
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/traindb?schema=public"
-JWT_SECRET="your-secret-key"
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
 PORT=3002
 ```
 
-## Getting Started
-
-1. Install dependencies:
+## Project Setup
 
 ```bash
 npm install
 ```
 
-2. Set up environment variables in `.env`
-
-3. Generate Prisma client:
+### Prisma Setup
 
 ```bash
-npm run prisma:generate
+npx prisma generate
+npx prisma migrate dev --name init
 ```
 
-4. Run database migrations:
+### Run the Application
 
 ```bash
-npm run prisma:migrate
-```
-
-5. Start the service:
-
-```bash
+# development
 npm run start:dev
+
+# production
+npm run build
+npm run start:prod
 ```
 
-## Database Schema
+The service will run at:
+**http://localhost:3002**
 
-The service uses PostgreSQL with the following main entities:
+## Built With
 
-- **Station**: Train stations with location data
-- **Train**: Trains with type and capacity information
-- **Schedule**: Train schedules with routes and timing
+- [NestJS](https://nestjs.com/)
+- [Prisma](https://www.prisma.io/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [JWT](https://jwt.io/)
 
-## Security Considerations
-
-- JWT tokens are validated on every protected request
-- Role-based access control is enforced at the controller level
-- All user inputs are validated using DTOs
-- Sensitive operations require ADMIN role
-- Internal endpoints are available for service-to-service communication
+**Made with ❤️ using NestJS Microservices**

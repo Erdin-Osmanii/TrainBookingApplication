@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/guards/roles.guard';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('schedules')
 export class ScheduleController {
@@ -100,5 +101,37 @@ export class ScheduleController {
   @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.scheduleService.remove(Number(id));
+  }
+
+  // TCP endpoints for internal microservice communication
+  @MessagePattern({ cmd: 'validate-route' })
+  async validateRouteTcp(
+    @Payload() data: { departureStationId: number; arrivalStationId: number },
+  ) {
+    return this.scheduleService.validateRoute(
+      data.departureStationId,
+      data.arrivalStationId,
+    );
+  }
+
+  @MessagePattern({ cmd: 'get-route-schedules' })
+  async getRouteSchedulesTcp(
+    @Payload()
+    data: {
+      departureStationId: number;
+      arrivalStationId: number;
+      date?: string;
+    },
+  ) {
+    return this.scheduleService.getRouteSchedules(
+      data.departureStationId,
+      data.arrivalStationId,
+      data.date,
+    );
+  }
+
+  @MessagePattern({ cmd: 'get-schedule-details' })
+  async getScheduleDetailsTcp(@Payload() data: { id: number }) {
+    return this.scheduleService.findOne(data.id);
   }
 }

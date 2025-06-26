@@ -4,10 +4,16 @@ import {
   TrainStatus,
   ScheduleStatus,
 } from '@prisma/client';
+import * as fs from 'fs';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  //If needed, uncomment the following lines to clear existing data
+  // await prisma.schedule.deleteMany();
+  // await prisma.train.deleteMany();
+  // await prisma.station.deleteMany();
+
   // Create stations
   const pristina = await prisma.station.create({
     data: {
@@ -95,8 +101,39 @@ async function main() {
 }
 
 main()
-  .then(() => {
-    console.log('Seeding completed successfully');
+  .then(async () => {
+    // Fetch all trains and their schedules
+    const trains = await prisma.train.findMany({
+      include: { schedules: true },
+    });
+
+    // Generate seat data for each schedule
+    const output: { trainId: number; scheduleId: number; seats: string[] }[] =
+      [];
+    for (const train of trains) {
+      for (const schedule of train.schedules) {
+        // Example: 2 coaches (A, B), 10 seats each
+        const seats: string[] = [];
+        ['A', 'B'].forEach((coach) => {
+          for (let i = 1; i <= 10; i++) {
+            seats.push(`${i}${coach}`);
+          }
+        });
+        output.push({
+          trainId: train.id,
+          scheduleId: schedule.id,
+          seats,
+        });
+      }
+    }
+
+    fs.writeFileSync(
+      __dirname + '/train-seed-data.json',
+      JSON.stringify(output, null, 2),
+    );
+    console.log(
+      'Seeding completed successfully and train-seed-data.json written',
+    );
   })
   .catch((e) => {
     console.error(e);

@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Seat {
+  id          String @id @default(cuid())
+  seatNumber  String
+  scheduleId  Int // Foreign key to a schedule in another service
+  trainId     Int // Foreign key to a train in another service
+  status      SeatStatus @default(AVAILABLE)
+  reservation Reservation?
+  hold        SeatHold?
+
+  @@unique([scheduleId, seatNumber])
+}
+
+model SeatHold {
+  id        String   @id @default(cuid())
+  seat      Seat     @relation(fields: [seatId], references: [id])
+  seatId    String   @unique
+  userId    String
+  expiresAt DateTime
+}
+
+model Reservation {
+  id         String   @id @default(cuid())
+  seat       Seat     @relation(fields: [seatId], references: [id])
+  seatId     String   @unique
+  userId     String
+  bookingId  String   @unique // From the booking service
+  createdAt  DateTime @default(now())
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  RESERVED
+}

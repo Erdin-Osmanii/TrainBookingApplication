@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/guards/roles.guard';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('trains')
 export class TrainController {
@@ -83,5 +84,26 @@ export class TrainController {
   @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.trainService.remove(Number(id));
+  }
+
+  // TCP endpoints for internal microservice communication
+  @MessagePattern({ cmd: 'validate-train' })
+  async validateTrainTcp(@Payload() data: { id: number }) {
+    return this.trainService.validateTrain(data.id);
+  }
+
+  @MessagePattern({ cmd: 'get-train-details' })
+  async getTrainDetailsTcp(@Payload() data: { id: number }) {
+    return this.trainService.getTrainDetails(data.id);
+  }
+
+  @MessagePattern({ cmd: 'get-train-schedules' })
+  async getTrainSchedulesTcp(@Payload() data: { id: number }) {
+    return this.trainService.getTrainSchedules(data.id);
+  }
+
+  @MessagePattern({ cmd: 'get-train-by-number' })
+  async getTrainByNumberTcp(@Payload() data: { trainNumber: string }) {
+    return this.trainService.findByNumber(data.trainNumber);
   }
 }

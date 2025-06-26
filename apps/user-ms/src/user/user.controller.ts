@@ -16,6 +16,7 @@ import { UserWithoutPassword, UserRole } from './schemas/user.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('users')
 export class UserController {
@@ -57,5 +58,21 @@ export class UserController {
   @Delete(':id')
   remove(@Param('id') id: string): Promise<UserWithoutPassword> {
     return this.userService.remove(Number(id));
+  }
+
+  // TCP endpoints for internal microservice communication
+  @MessagePattern({ cmd: 'validate-user' })
+  async validateUserTcp(@Payload() data: { id: number }) {
+    return this.userService.findOne(data.id);
+  }
+
+  @MessagePattern({ cmd: 'get-user-by-email' })
+  async getUserByEmailTcp(@Payload() data: { email: string }) {
+    return this.userService.findByEmail(data.email);
+  }
+
+  @MessagePattern({ cmd: 'get-user-details' })
+  async getUserDetailsTcp(@Payload() data: { id: number }) {
+    return this.userService.findOne(data.id);
   }
 }
