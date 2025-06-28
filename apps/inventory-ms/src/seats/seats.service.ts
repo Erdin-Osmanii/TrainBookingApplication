@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { HoldSeatsDto } from './dto/hold-seats.dto';
 import { ConfirmSeatsDto } from './dto/confirm-seats.dto';
 import { ReleaseSeatsDto } from './dto/release-seats.dto';
+import { ReleaseReservedSeatsDto } from './dto/release-reserved-seats.dto';
 import { SeatStatus, SeatHold } from '@prisma/client';
 
 const HOLD_DURATION_MINUTES = 15;
@@ -116,6 +117,40 @@ export class SeatsService {
     });
   }
 
+  async releaseReservedSeats(releaseReservedSeatsDto: ReleaseReservedSeatsDto) {
+    const { seatId } = releaseReservedSeatsDto;
+
+    return this.prisma.$transaction(async (tx) => {
+      const seat = await tx.seat.findUnique({
+        where: { id: seatId },
+        include: { reservation: true },
+      });
+
+      if (!seat) {
+        throw new NotFoundException('Seat not found.');
+      }
+
+      if (seat.status !== SeatStatus.RESERVED) {
+        throw new BadRequestException('Seat is not reserved.');
+      }
+
+      // Delete the reservation
+      if (seat.reservation) {
+        await tx.reservation.delete({
+          where: { id: seat.reservation.id },
+        });
+      }
+
+      // Update seat status to available
+      await tx.seat.update({
+        where: { id: seatId },
+        data: { status: SeatStatus.AVAILABLE },
+      });
+
+      return { message: 'Reserved seat released successfully.' };
+    });
+  }
+
   // Admin: Add a seat
   async createSeat({
     seatNumber,
@@ -148,5 +183,19 @@ export class SeatsService {
     return this.prisma.seatHold.findMany({
       where: { seatId },
     });
+  }
+
+  // Get seat details by seat IDs
+  async getSeatDetails(
+    seatIds: string[],
+  ): Promise<{ id: string; seatNumber: string }[]> {
+    const seats = await this.prisma.seat.findMany({
+      where: { id: { in: seatIds } },
+      select: {
+        id: true,
+        seatNumber: true,
+      },
+    });
+    return seats;
   }
 }

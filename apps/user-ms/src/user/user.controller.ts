@@ -62,8 +62,8 @@ export class UserController {
 
   // TCP endpoints for internal microservice communication
   @MessagePattern({ cmd: 'validate-user' })
-  async validateUserTcp(@Payload() data: { id: number }) {
-    return this.userService.findOne(data.id);
+  async validateUserTcp(@Payload() data: { userId: number }) {
+    return this.userService.findOne(data.userId);
   }
 
   @MessagePattern({ cmd: 'get-user-by-email' })
@@ -72,7 +72,7 @@ export class UserController {
   }
 
   @MessagePattern({ cmd: 'get-user-details' })
-  async getUserDetailsTcp(@Payload() data: { id: number }) {
-    return this.userService.findOne(data.id);
+  async getUserDetailsTcp(@Payload() data: { userId: number }) {
+    return this.userService.findOne(data.userId);
   }
 }

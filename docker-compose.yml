@@ -1,16 +1,78 @@
 version: '3.8'
+
 services:
-  postgres-inventory:
-    image: postgres:13
-    container_name: postgres-inventory
-    ports:
-      - '5433:5432'
+  postgres:
+    image: postgres:15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: inventory
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres-inventory-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+  user-ms:
+    build:
+      context: ./apps/user-ms
+      dockerfile: Dockerfile
+    ports:
+      - "${USER_MS_PORT:-3001}:3001"
+      - "${USER_MS_TCP_PORT:-4001}:4001"
+    environment:
+      DATABASE_URL: ${USER_DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - postgres
+
+  train-ms:
+    build:
+      context: ./apps/train-ms
+      dockerfile: Dockerfile
+    ports:
+      - "${TRAIN_MS_PORT:-3002}:3002"
+      - "${TRAIN_MS_TCP_PORT:-4002}:4002"
+    environment:
+      DATABASE_URL: ${TRAIN_DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - postgres
+
+  inventory-ms:
+    build:
+      context: ./apps/inventory-ms
+      dockerfile: Dockerfile
+    ports:
+      - "${INVENTORY_MS_PORT:-3003}:3003"
+      - "${INVENTORY_MS_TCP_PORT:-4003}:4003"
+    environment:
+      DATABASE_URL: ${INVENTORY_MS_DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - postgres
+
+  booking-ms:
+    build:
+      context: ./apps/booking-ms
+      dockerfile: Dockerfile
+    ports:
+      - "${BOOKING_MS_PORT:-3004}:3004"
+      - "${BOOKING_MS_TCP_PORT:-4004}:4004"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      USER_MS_URL: ${USER_MS_URL}
+      TRAIN_MS_URL: ${TRAIN_MS_URL}
+      INVENTORY_MS_URL: ${INVENTORY_MS_URL}
+      USER_MS_TCP_HOST: ${USER_MS_TCP_HOST}
+      USER_MS_TCP_PORT: ${USER_MS_TCP_PORT}
+      TRAIN_MS_TCP_HOST: ${TRAIN_MS_TCP_HOST}
+      TRAIN_MS_TCP_PORT: ${TRAIN_MS_TCP_PORT}
+      INVENTORY_MS_TCP_HOST: ${INVENTORY_MS_TCP_HOST}
+      INVENTORY_MS_TCP_PORT: ${INVENTORY_MS_TCP_PORT}
+    depends_on:
+      - user-ms
+      - train-ms
+      - inventory-ms
 
 volumes:
-  postgres-inventory-data: 
+  postgres_data: 

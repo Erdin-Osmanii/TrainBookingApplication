@@ -14,6 +14,7 @@ import { SeatsService } from './seats.service';
 import { HoldSeatsDto } from './dto/hold-seats.dto';
 import { ConfirmSeatsDto } from './dto/confirm-seats.dto';
 import { ReleaseSeatsDto } from './dto/release-seats.dto';
+import { ReleaseReservedSeatsDto } from './dto/release-reserved-seats.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -56,6 +57,20 @@ export class SeatsController {
     return this.seatsService.releaseSeats(releaseSeatsDto);
   }
 
+  @Post('/release-reserved')
+  async releaseReservedSeatsHttp(
+    @Body() releaseReservedSeatsDto: ReleaseReservedSeatsDto,
+  ) {
+    return this.seatsService.releaseReservedSeats(releaseReservedSeatsDto);
+  }
+
+  @MessagePattern({ cmd: 'release-reserved-seats' })
+  releaseReservedSeats(
+    @Payload() releaseReservedSeatsDto: ReleaseReservedSeatsDto,
+  ) {
+    return this.seatsService.releaseReservedSeats(releaseReservedSeatsDto);
+  }
+
   @Get('held-by-seat/:seatId')
   getHoldBySeatId(@Param('seatId') seatId: string): Promise<SeatHold[]> {
     return this.seatsService.getHoldBySeatId(seatId);
@@ -64,6 +79,11 @@ export class SeatsController {
   @MessagePattern({ cmd: 'get-held-by-seat-id' })
   getHoldBySeatIdTcp(@Payload() data: { seatId: string }): Promise<SeatHold[]> {
     return this.seatsService.getHoldBySeatId(data.seatId);
+  }
+
+  @MessagePattern({ cmd: 'get-seat-details' })
+  getSeatDetailsTcp(@Payload() data: { seatIds: string[] }): Promise<any[]> {
+    return this.seatsService.getSeatDetails(data.seatIds);
   }
 
   // Admin: Add a seat

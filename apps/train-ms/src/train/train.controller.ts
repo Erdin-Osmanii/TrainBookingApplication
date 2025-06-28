@@ -93,8 +93,8 @@ export class TrainController {
   }
 
   @MessagePattern({ cmd: 'get-train-details' })
-  async getTrainDetailsTcp(@Payload() data: { id: number }) {
-    return this.trainService.getTrainDetails(data.id);
+  async getTrainDetailsTcp(@Payload() data: { trainId: number }) {
+    return this.trainService.getTrainDetails(data.trainId);
   }
 
   @MessagePattern({ cmd: 'get-train-schedules' })

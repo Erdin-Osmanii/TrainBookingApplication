@@ -131,7 +131,12 @@ export class ScheduleController {
   }
 
   @MessagePattern({ cmd: 'get-schedule-details' })
-  async getScheduleDetailsTcp(@Payload() data: { id: number }) {
-    return this.scheduleService.findOne(data.id);
+  async getScheduleDetailsTcp(@Payload() data: { scheduleId: number }) {
+    return this.scheduleService.findOne(data.scheduleId);
+  }
+
+  @MessagePattern({ cmd: 'validate-schedule' })
+  async validateScheduleTcp(@Payload() data: { scheduleId: number }) {
+    return this.scheduleService.findOne(data.scheduleId);
   }
 }
