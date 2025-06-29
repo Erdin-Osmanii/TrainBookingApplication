@@ -136,6 +136,23 @@ export class HoldSeatsResponseDto {
 export class ConfirmSeatsDto {
   @IsString()
   holdId: string;
+
+  @IsString()
+  bookingId: string;
+}
+
+export class ConfirmSeatsResponseDto {
+  @IsString()
+  id: string;
+
+  @IsString()
+  seatId: string;
+
+  @IsString()
+  userId: string;
+
+  @IsString()
+  bookingId: string;
 }
 
 export class ReleaseSeatsDto {

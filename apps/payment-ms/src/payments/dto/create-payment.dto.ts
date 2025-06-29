@@ -1,18 +1,15 @@
-import {
-  IsString,
-  IsNumber,
-  IsPositive,
-  IsNotEmpty,
-  IsOptional,
-} from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsOptional } from "class-validator";
 
-export class ConfirmBookingDto {
+export class CreatePaymentDto {
   @IsString()
   @IsNotEmpty()
   bookingId: string;
 
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
   @IsNumber()
-  @IsPositive()
   amount: number;
 
   // Credit card details (will be converted to payment method internally)

@@ -1,6 +1,6 @@
 # Booking Microservice
 
-A NestJS microservice that orchestrates the train booking process across multiple microservices. This service coordinates between the user, train, and inventory microservices to provide a seamless booking experience.
+A NestJS microservice that orchestrates the train booking process across multiple microservices. This service coordinates between the user, train, inventory, and payment microservices to provide a seamless booking experience with persistent storage.
 
 ## Features
 
@@ -8,10 +8,11 @@ A NestJS microservice that orchestrates the train booking process across multipl
 - **Seat Management**: Integrates with inventory-ms for seat holding, confirmation, and release
 - **User Validation**: Validates users through user-ms
 - **Schedule Validation**: Validates train schedules through train-ms
+- **Payment Integration**: Processes payments through payment-ms with Stripe
 - **JWT Authentication**: Secure endpoints with JWT token validation and user extraction
-- **In-Memory Storage**: Lightweight in-memory storage for booking records (no database required)
+- **Persistent Storage**: PostgreSQL database storage for booking records with Prisma ORM
 - **Error Handling**: Comprehensive error handling and logging
-- **Microservice Communication**: HTTP-based communication with other microservices
+- **Microservice Communication**: TCP-based communication with other microservices
 - **Hybrid Architecture**: Supports both HTTP endpoints and TCP microservice communication
 
 ## Architecture
@@ -20,11 +21,12 @@ The booking-ms acts as an orchestration layer that:
 
 1. **Validates** user and schedule data through respective microservices
 2. **Holds** seats in inventory-ms during booking creation
-3. **Confirms** or **releases** seats based on user actions
-4. **Maintains** booking state in memory for the session
-5. **Coordinates** the entire booking workflow
-6. **Extracts** user information from JWT tokens
-7. **Supports** both HTTP and TCP communication patterns
+3. **Processes** payments through payment-ms during confirmation
+4. **Confirms** or **releases** seats based on user actions
+5. **Maintains** booking state in PostgreSQL database
+6. **Coordinates** the entire booking workflow
+7. **Extracts** user information from JWT tokens
+8. **Supports** both HTTP and TCP communication patterns
 
 ## Ports
 
@@ -121,6 +123,71 @@ Cancels a booking and releases held seats.
   "status": "CANCELLED",
   "cancelledAt": "2024-01-15T10:35:00.000Z",
   "message": "Booking cancelled successfully"
+}
+```
+
+### Get User Bookings
+
+**GET** `/bookings`
+
+Retrieves all bookings for the authenticated user.
+
+**Response:**
+
+```json
+{
+  "bookings": [
+    {
+      "id": "booking_1",
+      "scheduleId": 1,
+      "seats": [
+        {
+          "id": "seat_1",
+          "seatNumber": "A1"
+        }
+      ],
+      "status": "CONFIRMED",
+      "notes": "Window seat preferred",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "confirmedAt": "2024-01-15T10:32:00.000Z",
+      "cancelledAt": null
+    }
+  ],
+  "count": 1
+}
+```
+
+### Get Booking Details
+
+**GET** `/bookings/:bookingId`
+
+Retrieves detailed booking information including schedule and seat details.
+
+**Response:**
+
+```json
+{
+  "id": "booking_1",
+  "scheduleId": 1,
+  "seats": [
+    {
+      "id": "seat_1",
+      "seatNumber": "A1"
+    }
+  ],
+  "status": "CONFIRMED",
+  "notes": "Window seat preferred",
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "confirmedAt": "2024-01-15T10:32:00.000Z",
+  "cancelledAt": null,
+  "schedule": {
+    "origin": "New York",
+    "destination": "Boston",
+    "departureTime": "2024-01-15T10:00:00.000Z",
+    "arrivalTime": "2024-01-15T12:00:00.000Z",
+    "trainNumber": "T123",
+    "trainName": "Northeast Express"
+  }
 }
 ```
 
@@ -248,10 +315,24 @@ PORT=3004
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key-here
 
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/booking_db
+
 # Microservice URLs
 USER_MS_URL=http://localhost:3001
 TRAIN_MS_URL=http://localhost:3002
 INVENTORY_MS_URL=http://localhost:3003
+PAYMENT_MS_URL=http://localhost:3005
+
+# TCP Communication
+USER_MS_TCP_HOST=localhost
+USER_MS_TCP_PORT=4001
+TRAIN_MS_TCP_HOST=localhost
+TRAIN_MS_TCP_PORT=4002
+INVENTORY_MS_TCP_HOST=localhost
+INVENTORY_MS_TCP_PORT=4003
+PAYMENT_MS_TCP_HOST=localhost
+PAYMENT_MS_TCP_PORT=4005
 ```
 
 ## Installation & Setup
@@ -269,7 +350,14 @@ INVENTORY_MS_URL=http://localhost:3003
    # Edit .env with your configuration
    ```
 
-3. **Start the service:**
+3. **Set up database:**
+
+   ```bash
+   npx prisma generate
+   npx prisma migrate dev --name init
+   ```
+
+4. **Start the service:**
 
    ```bash
    # Development
@@ -288,6 +376,7 @@ INVENTORY_MS_URL=http://localhost:3003
 - **@nestjs/microservices**: Microservice communication
 - **@nestjs/passport**: Authentication strategies
 - **@nestjs/platform-express**: Express platform
+- **@prisma/client**: Prisma ORM client
 - **class-transformer**: Object transformation
 - **class-validator**: Validation decorators
 - **passport-jwt**: JWT passport strategy
@@ -320,11 +409,12 @@ npm run format
 
 ## Microservice Communication
 
-The booking-ms communicates with other microservices using HTTP clients:
+The booking-ms communicates with other microservices using TCP clients:
 
 - **UserClient**: Validates user existence and permissions
 - **TrainClient**: Validates train schedules and retrieves schedule information
 - **InventoryClient**: Manages seat holds, confirmations, and releases
+- **PaymentClient**: Processes payments and refunds
 
 ## JWT User Extraction
 
@@ -347,25 +437,40 @@ User information includes:
    - Validate user exists
    - Validate schedule exists
    - Hold seats in inventory-ms
-   - Create booking record with PENDING status
+   - Create booking record with PENDING status in database
 
 2. **Confirm Booking**:
    - Extract user from JWT token
    - Validate booking ownership
+   - Process payment through payment-ms
    - Confirm all seat holds in inventory-ms
-   - Update booking status to CONFIRMED
+   - Update booking status to CONFIRMED in database
 
 3. **Cancel Booking**:
    - Extract user from JWT token
    - Validate booking ownership
+   - Process refund through payment-ms if payment was made
    - Release seat holds if still PENDING
-   - Update booking status to CANCELLED
+   - Update booking status to CANCELLED in database
+
+## Database Schema
+
+The service uses a `Booking` model with the following fields:
+
+- `id`: Unique booking identifier
+- `userId`: User who made the booking
+- `scheduleId`: Associated train schedule
+- `status`: Booking status (PENDING, CONFIRMED, CANCELLED)
+- `notes`: Optional booking notes
+- `createdAt`: Booking creation timestamp
+- `confirmedAt`: Booking confirmation timestamp
+- `cancelledAt`: Booking cancellation timestamp
 
 ## Notes
 
-- This service uses in-memory storage for booking records
-- Booking data is not persisted across service restarts
-- For production use, consider implementing a proper database or external storage
-- The service is designed to be stateless and can be scaled horizontally
+- This service uses PostgreSQL database for persistent booking storage
+- Booking data is persisted across service restarts
+- The service integrates with payment-ms for payment processing
+- Enhanced seat information includes both seat ID and seat number
 - Supports both HTTP API and TCP microservice communication patterns
 - User information is extracted from JWT tokens for all operations

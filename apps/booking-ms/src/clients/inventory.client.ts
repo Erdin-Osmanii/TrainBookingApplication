@@ -9,6 +9,7 @@ import {
   HoldSeatsDto,
   HoldSeatsResponseDto,
   ConfirmSeatsDto,
+  ConfirmSeatsResponseDto,
   ReleaseSeatsDto,
   ReleaseReservedSeatsDto,
   ReleaseSeatsResponseDto,
@@ -55,16 +56,20 @@ export class InventoryClient {
     }
   }
 
-  async confirmSeats(data: ConfirmSeatsDto): Promise<{ message: string }> {
+  async confirmSeats(data: ConfirmSeatsDto): Promise<ConfirmSeatsResponseDto> {
     try {
       this.logger.log(`Confirming seats for hold ${data.holdId}`);
 
       const result = await this.client
-        .send<{ message: string }>({ cmd: 'confirm-seats' }, data)
+        .send<ConfirmSeatsResponseDto>({ cmd: 'confirm-seats' }, data)
         .toPromise();
 
+      if (!result) {
+        throw new HttpException('Failed to confirm seats', 400);
+      }
+
       this.logger.log(`Successfully confirmed seats for hold ${data.holdId}`);
-      return result || { message: 'Seats confirmed successfully' };
+      return result;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

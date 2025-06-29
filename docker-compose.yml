@@ -59,20 +59,41 @@ services:
       - "${BOOKING_MS_PORT:-3004}:3004"
       - "${BOOKING_MS_TCP_PORT:-4004}:4004"
     environment:
+      DATABASE_URL: ${BOOKING_DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       USER_MS_URL: ${USER_MS_URL}
       TRAIN_MS_URL: ${TRAIN_MS_URL}
       INVENTORY_MS_URL: ${INVENTORY_MS_URL}
+      PAYMENT_MS_URL: ${PAYMENT_MS_URL}
       USER_MS_TCP_HOST: ${USER_MS_TCP_HOST}
       USER_MS_TCP_PORT: ${USER_MS_TCP_PORT}
       TRAIN_MS_TCP_HOST: ${TRAIN_MS_TCP_HOST}
       TRAIN_MS_TCP_PORT: ${TRAIN_MS_TCP_PORT}
       INVENTORY_MS_TCP_HOST: ${INVENTORY_MS_TCP_HOST}
       INVENTORY_MS_TCP_PORT: ${INVENTORY_MS_TCP_PORT}
+      PAYMENT_MS_TCP_HOST: ${PAYMENT_MS_TCP_HOST}
+      PAYMENT_MS_TCP_PORT: ${PAYMENT_MS_TCP_PORT}
     depends_on:
       - user-ms
       - train-ms
       - inventory-ms
+      - payment-ms
+
+  payment-ms:
+    build:
+      context: ./apps/payment-ms
+      dockerfile: Dockerfile
+    ports:
+      - "${PAYMENT_MS_PORT:-3005}:3005"
+      - "${PAYMENT_MS_TCP_PORT:-4005}:4005"
+    environment:
+      DATABASE_URL: ${PAYMENT_DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      BOOKING_MS_TCP_HOST: ${BOOKING_MS_TCP_HOST}
+      BOOKING_MS_TCP_PORT: ${BOOKING_MS_TCP_PORT}
+    depends_on:
+      - postgres
 
 volumes:
   postgres_data: 

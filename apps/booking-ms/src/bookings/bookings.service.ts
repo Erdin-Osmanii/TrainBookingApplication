@@ -17,6 +17,7 @@ import {
 import { InventoryClient } from '../clients/inventory.client';
 import { TrainClient } from '../clients/train.client';
 import { UserClient } from '../clients/user.client';
+import { PaymentClient } from '../clients/payment.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingEntityDto, BookingStatus } from './dto/booking-entity.dto';
 
@@ -32,6 +33,7 @@ export class BookingsService {
     private readonly inventoryClient: InventoryClient,
     private readonly trainClient: TrainClient,
     private readonly userClient: UserClient,
+    private readonly paymentClient: PaymentClient,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -108,17 +110,57 @@ export class BookingsService {
       }
 
       if (booking.status !== BookingStatus.PENDING) {
+        throw new BadRequestException('Booking is not in pending status');
+      }
+
+      // 2. Get schedule price from train-ms
+      const schedulePrice = await this.trainClient.getSchedulePrice(
+        booking.scheduleId,
+      );
+
+      // 3. Validate payment amount
+      if (dto.amount < schedulePrice) {
         throw new BadRequestException(
-          `Cannot confirm booking with status ${booking.status}`,
+          `Payment amount (${dto.amount}) must be at least the schedule price (${schedulePrice})`,
         );
       }
 
-      // 2. Confirm each seat hold
-      for (const holdId of booking.holdIds) {
-        await this.inventoryClient.confirmSeats({ holdId });
+      // 4. Process payment with credit card details
+      const paymentData = {
+        bookingId: dto.bookingId,
+        userId: user.id.toString(),
+        amount: schedulePrice, // Only charge the schedule price
+        cardNumber: dto.cardNumber,
+        expiryMonth: dto.expiryMonth,
+        expiryYear: dto.expiryYear,
+        cvc: dto.cvc,
+        zipCode: dto.zipCode,
+      };
+
+      const paymentResult =
+        await this.paymentClient.processPayment(paymentData);
+
+      if (!paymentResult.success) {
+        throw new BadRequestException(
+          `Payment failed: ${paymentResult.message}`,
+        );
       }
 
-      // 3. Update booking status to CONFIRMED
+      // 5. Confirm seats in inventory-ms
+      for (const holdId of booking.holdIds) {
+        const confirmSeatsResult = await this.inventoryClient.confirmSeats({
+          holdId,
+          bookingId: dto.bookingId,
+        });
+
+        if (!confirmSeatsResult) {
+          throw new BadRequestException(
+            `Seat confirmation failed for hold ${holdId}`,
+          );
+        }
+      }
+
+      // 6. Update booking status to CONFIRMED
       const updatedBooking = (await this.prisma.booking.update({
         where: { id: dto.bookingId },
         data: {
@@ -127,7 +169,7 @@ export class BookingsService {
         },
       })) as BookingEntityDto;
 
-      this.logger.log(`Successfully confirmed booking ${dto.bookingId}`);
+      this.logger.log(`Booking ${dto.bookingId} confirmed successfully`);
 
       return {
         bookingId: updatedBooking.id,
@@ -177,9 +219,26 @@ export class BookingsService {
         for (const seatId of booking.seatIds) {
           await this.inventoryClient.releaseReservedSeats({ seatId });
         }
+
+        // 4. Process refund for confirmed booking
+        const refundResult = await this.paymentClient.processRefund(
+          dto.bookingId,
+          user.id.toString(),
+        );
+
+        if (!refundResult.success) {
+          this.logger.warn(
+            `Refund failed for booking ${dto.bookingId}: ${refundResult.message}`,
+          );
+          // Continue with cancellation even if refund fails
+        } else {
+          this.logger.log(
+            `Refund successful for booking ${dto.bookingId}: ${refundResult.paymentId}`,
+          );
+        }
       }
 
-      // 4. Update booking status to CANCELLED
+      // 5. Update booking status to CANCELLED
       const updatedBooking = (await this.prisma.booking.update({
         where: { id: dto.bookingId },
         data: {
@@ -298,6 +357,29 @@ export class BookingsService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to get booking: ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  async getBookingByIdInternal(bookingId: string): Promise<BookingEntityDto> {
+    this.logger.log(`Getting booking ${bookingId} for internal processing`);
+
+    try {
+      const booking = (await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+      })) as BookingEntityDto | null;
+
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      return booking;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to get booking for internal processing: ${errorMessage}`,
+      );
       throw error;
     }
   }

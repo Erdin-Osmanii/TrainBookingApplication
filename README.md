@@ -1,10 +1,10 @@
 # Train Booking Application
 
-A microservices-based train booking system built with NestJS, featuring user management, train scheduling, inventory management, and booking orchestration with persistent storage and enhanced seat information.
+A microservices-based train booking system built with NestJS, featuring user management, train scheduling, inventory management, booking orchestration, and payment processing with persistent storage and enhanced seat information.
 
 ## Architecture
 
-The application consists of four microservices, each supporting both HTTP API and TCP microservice communication:
+The application consists of five microservices, each supporting both HTTP API and TCP microservice communication:
 
 - **user-ms**: User management and authentication
   - HTTP API: Port 3001
@@ -18,6 +18,9 @@ The application consists of four microservices, each supporting both HTTP API an
 - **booking-ms**: Booking orchestration and workflow management with persistent storage
   - HTTP API: Port 3004
   - TCP Microservice: Port 4004
+- **payment-ms**: Payment processing with Stripe integration
+  - HTTP API: Port 3005
+  - TCP Microservice: Port 4005
 
 ## Quick Start
 
@@ -64,6 +67,7 @@ The application consists of four microservices, each supporting both HTTP API an
    - Train MS: http://localhost:3002 (HTTP) / localhost:4002 (TCP)
    - Inventory MS: http://localhost:3003 (HTTP) / localhost:4003 (TCP)
    - Booking MS: http://localhost:3004 (HTTP) / localhost:4004 (TCP)
+   - Payment MS: http://localhost:3005 (HTTP) / localhost:4005 (TCP)
 
 ### Manual Setup (Alternative)
 
@@ -86,7 +90,7 @@ If you prefer to run services individually:
 3. **Setup each microservice**
 
    ```bash
-   # For each microservice (user-ms, train-ms, inventory-ms, booking-ms)
+   # For each microservice (user-ms, train-ms, inventory-ms, booking-ms, payment-ms)
    cd apps/<service-name>
    npm install
    npx prisma generate
@@ -115,6 +119,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 USER_MS_URL=http://user-ms:3001
 TRAIN_MS_URL=http://train-ms:3002
 INVENTORY_MS_URL=http://inventory-ms:3003
+PAYMENT_MS_URL=http://payment-ms:3005
 
 # TCP Communication (for booking-ms)
 USER_MS_TCP_HOST=user-ms
@@ -123,18 +128,25 @@ TRAIN_MS_TCP_HOST=train-ms
 TRAIN_MS_TCP_PORT=4002
 INVENTORY_MS_TCP_HOST=inventory-ms
 INVENTORY_MS_TCP_PORT=4003
+PAYMENT_MS_TCP_HOST=payment-ms
+PAYMENT_MS_TCP_PORT=4005
 
 # Service Ports
 USER_MS_PORT=3001
 TRAIN_MS_PORT=3002
 INVENTORY_MS_PORT=3003
 BOOKING_MS_PORT=3004
+PAYMENT_MS_PORT=3005
+
+# Stripe Configuration (for payment-ms)
+STRIPE_SECRET_KEY=your-stripe-secret-key-here
 
 # Database URLs (auto-generated from above variables)
 USER_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/User?schema=public
 TRAIN_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/Train?schema=public
 INVENTORY_MS_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/Inventory?schema=public
 BOOKING_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/Booking?schema=public
+PAYMENT_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/Payment?schema=public
 ```
 
 ### Security Notes
@@ -253,14 +265,28 @@ The JWT token contains:
 - `{ cmd: 'confirm-booking' }` - Confirm pending booking
 - `{ cmd: 'cancel-booking' }` - Cancel booking
 
+### Payment Management (payment-ms)
+
+**HTTP Endpoints:**
+
+- `POST /payments` - Process payment for booking
+- `POST /payments/refund` - Process refund for booking
+- `GET /payments/booking/:bookingId` - Get payment details for booking
+
+**TCP Endpoints:**
+
+- `{ cmd: 'process-payment' }` - Process payment with card details
+- `{ cmd: 'process-refund' }` - Process refund for booking
+
 ## Booking Workflow
 
 1. **User Authentication**: Login through user-ms to get JWT token
 2. **Schedule Selection**: Browse available schedules through train-ms
 3. **Seat Selection**: Check seat availability through inventory-ms
 4. **Booking Creation**: Create booking through booking-ms (holds seats for 15 minutes)
-5. **Booking Confirmation**: Confirm booking to finalize seat reservation
-6. **Booking Management**: View, manage, and cancel bookings as needed
+5. **Payment Processing**: Process payment through payment-ms using Stripe
+6. **Booking Confirmation**: Confirm booking to finalize seat reservation
+7. **Booking Management**: View, manage, and cancel bookings as needed
 
 ## Enhanced Features
 
@@ -289,6 +315,13 @@ The JWT token contains:
 - **Type Safety**: Proper DTOs for all microservice communications
 - **Error Handling**: Comprehensive error handling and logging
 - **Seat Details**: New endpoint to fetch seat information from inventory service
+
+### Payment Integration
+
+- **Stripe Integration**: Secure payment processing with Stripe
+- **Test Card Support**: Automatic mapping of test card numbers to Stripe test tokens
+- **Refund Processing**: Automatic refund processing for cancelled bookings
+- **Payment Tracking**: Complete payment history and status tracking
 
 ## API Examples
 
@@ -384,6 +417,38 @@ Authorization: Bearer <jwt-token>
 }
 ```
 
+### Process Payment
+
+```http
+POST http://localhost:3005/payments
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+
+{
+  "bookingId": "cmcgav43k0003f9gvfd56v73t",
+  "userId": "user_456",
+  "amount": 150.00,
+  "cardNumber": "4242424242424242",
+  "expiryMonth": "12",
+  "expiryYear": "2025",
+  "cvc": "123",
+  "zipCode": "12345"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Payment processed successfully",
+  "paymentId": "payment_789",
+  "bookingId": "cmcgav43k0003f9gvfd56v73t",
+  "amount": 150.0,
+  "status": "PAID"
+}
+```
+
 ## Database Schema
 
 Each microservice has its own database with the following schemas:
@@ -410,6 +475,11 @@ Each microservice has its own database with the following schemas:
 - **Booking**: Persistent booking records with status tracking
 - **BookingStatus**: Enum for booking states (PENDING, CONFIRMED, CANCELLED)
 
+### Payment Database
+
+- **Payment**: Payment records with Stripe integration
+- **PaymentStatus**: Enum for payment states (PENDING, PAID, FAILED, REFUNDED)
+
 ## Development
 
 ### Project Structure
@@ -420,7 +490,8 @@ TrainBookingApplication/
 │   ├── user-ms/          # User management service
 │   ├── train-ms/         # Train management service
 │   ├── inventory-ms/     # Inventory management service
-│   └── booking-ms/       # Booking orchestration service
+│   ├── booking-ms/       # Booking orchestration service
+│   └── payment-ms/       # Payment processing service
 ├── docker-compose.yml    # Docker orchestration
 └── README.md            # This file
 ```

@@ -63,7 +63,7 @@ export class SeatsService {
   }
 
   async confirmSeats(confirmSeatsDto: ConfirmSeatsDto) {
-    const { holdId } = confirmSeatsDto;
+    const { holdId, bookingId } = confirmSeatsDto;
 
     return this.prisma.$transaction(async (tx) => {
       const hold = await tx.seatHold.findUnique({
@@ -79,7 +79,7 @@ export class SeatsService {
         data: {
           seatId: hold.seatId,
           userId: hold.userId,
-          bookingId: `booking_${new Date().getTime()}`, // Example booking ID
+          bookingId: bookingId,
         },
       });
 

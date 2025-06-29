@@ -43,6 +43,32 @@ export class TrainClient {
     }
   }
 
+  async getSchedulePrice(scheduleId: number): Promise<number> {
+    try {
+      this.logger.log(`Getting schedule price for schedule ${scheduleId}`);
+
+      const payload: GetScheduleDetailsDto = { scheduleId };
+      const result = await this.client
+        .send<ScheduleDetailsResponseDto>(
+          { cmd: 'get-schedule-details' },
+          payload,
+        )
+        .toPromise();
+
+      if (!result) {
+        throw new HttpException('Schedule not found', 404);
+      }
+
+      this.logger.log(
+        `Successfully retrieved schedule price for schedule ${scheduleId}: ${result.price}`,
+      );
+      return result.price;
+    } catch (error) {
+      this.logger.error(`Failed to get schedule price: ${error.message}`);
+      throw new HttpException(error.message || 'Schedule not found', 404);
+    }
+  }
+
   async getScheduleDetails(
     scheduleId: number,
   ): Promise<ScheduleDetailsResponseDto> {
